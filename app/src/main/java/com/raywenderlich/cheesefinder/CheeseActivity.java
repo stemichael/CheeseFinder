@@ -55,85 +55,45 @@ public class CheeseActivity extends BaseSearchActivity {
 
         mDisposable = searchTextObservable
                 .observeOn(AndroidSchedulers.mainThread())
-                .doOnNext(new Consumer<String>() {
-                    @Override
-                    public void accept(String s) {
-                        showProgressBar();
-                    }
-                })
+                .doOnNext(s -> showProgressBar())
                 .observeOn(Schedulers.io())
-                .map(new Function<String, List<String>>() {
-                    @Override
-                    public List<String> apply(String query) {
-                        return mCheeseSearchEngine.search(query);
-                    }
-                })
+                .map(query -> mCheeseSearchEngine.search(query))
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new Consumer<List<String>>() {
-                    @Override
-                    public void accept(List<String> result) {
-                        hideProgressBar();
-                        showResult(result);
-                    }
+                .subscribe(result -> {
+                    hideProgressBar();
+                    showResult(result);
                 });
     }
 
     private Observable<String> createTextChangeObservable() {
-        Observable<String> textChangeObservable = Observable.create(new ObservableOnSubscribe<String>() {
-            @Override
-            public void subscribe(final ObservableEmitter<String> emitter) throws Exception {
-                final TextWatcher watcher = new TextWatcher() {
-                    @Override
-                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        Observable<String> textChangeObservable = Observable.create(emitter -> {
+            final TextWatcher watcher = new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-                    @Override
-                    public void afterTextChanged(Editable s) {}
+                @Override
+                public void afterTextChanged(Editable s) {}
 
-                    @Override
-                    public void onTextChanged(CharSequence s, int start, int before, int count) {
-                        emitter.onNext(s.toString());
-                    }
-                };
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    emitter.onNext(s.toString());
+                }
+            };
 
-                mQueryEditText.addTextChangedListener(watcher);
+            mQueryEditText.addTextChangedListener(watcher);
 
-                emitter.setCancellable(new Cancellable() {
-                    @Override
-                    public void cancel() throws Exception {
-                        mQueryEditText.removeTextChangedListener(watcher);
-                    }
-                });
-            }
+            emitter.setCancellable(() -> mQueryEditText.removeTextChangedListener(watcher));
         });
         return textChangeObservable
-                .filter(new Predicate<String>() {
-                    @Override
-                    public boolean test(String query) throws Exception {
-                        return query.length() >= 2;
-                    }
-                }).debounce(1000, TimeUnit.MILLISECONDS);
+                .filter(query -> query.length() >= 2).debounce(1000, TimeUnit.MILLISECONDS);
     }
 
 
     private Observable<String> createButtonClickObservable() {
-        return Observable.create(new ObservableOnSubscribe<String>() {
+        return Observable.create(emitter -> {
+            mSearchButton.setOnClickListener(view -> emitter.onNext(mQueryEditText.getText().toString()));
 
-            @Override
-            public void subscribe(final ObservableEmitter<String> emitter) throws Exception {
-                mSearchButton.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        emitter.onNext(mQueryEditText.getText().toString());
-                    }
-                });
-
-                emitter.setCancellable(new Cancellable() {
-                    @Override
-                    public void cancel() throws Exception {
-                        mSearchButton.setOnClickListener(null);
-                    }
-                });
-            }
+            emitter.setCancellable(() -> mSearchButton.setOnClickListener(null));
         });
     }
 
